@@ -644,17 +644,18 @@ func (p *AppleVMProvider) shouldBackoff(cID string) bool {
 }
 
 func (p *AppleVMProvider) cleanupPodContainers(ctx context.Context, pod *corev1.Pod) {
+	// Use a context that won't be cancelled by the parent — cleanup must
+	// finish even if the informer or kubelet context is cancelled (e.g. after
+	// force-deleting the pod from the API server).
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+
 	var wg sync.WaitGroup
 	for _, c := range pod.Spec.Containers {
 		wg.Add(1)
 		go func(cID string) {
 			defer wg.Done()
-			if err := p.hv.Stop(ctx, cID); err != nil {
-				log.G(ctx).WithError(err).WithField("container", cID).Debug("stop failed during cleanup")
-			}
-			if err := p.hv.Remove(ctx, cID); err != nil {
-				log.G(ctx).WithError(err).WithField("container", cID).Debug("remove failed during cleanup")
-			}
+			p.stopAndRemoveContainer(cleanupCtx, cID)
 		}(containerID(pod, c.Name))
 	}
 	wg.Wait()
@@ -662,6 +663,60 @@ func (p *AppleVMProvider) cleanupPodContainers(ctx context.Context, pod *corev1.
 	// Clean up volume dirs.
 	podDir := filepath.Join(os.TempDir(), "applevm-volumes", pod.Namespace, pod.Name)
 	_ = os.RemoveAll(podDir)
+}
+
+// stopAndRemoveContainer stops a container, waits for it to actually stop, and
+// then removes it. Falls back to SIGKILL if the graceful stop doesn't work.
+func (p *AppleVMProvider) stopAndRemoveContainer(ctx context.Context, cID string) {
+	logger := log.G(ctx).WithField("container", cID)
+
+	// Try graceful stop first.
+	if err := p.hv.Stop(ctx, cID); err != nil {
+		logger.WithError(err).Warn("graceful stop failed, attempting SIGKILL")
+		if err := p.hv.Kill(ctx, cID, "SIGKILL"); err != nil {
+			logger.WithError(err).Warn("SIGKILL failed")
+		}
+	}
+
+	// Wait for the container to actually stop before removing.
+	if !p.waitForStop(ctx, cID, 10*time.Second) {
+		logger.Warn("container did not stop in time, forcing removal")
+	}
+
+	// Remove the container, retrying once on failure.
+	if err := p.hv.Remove(ctx, cID); err != nil {
+		logger.WithError(err).Warn("first remove attempt failed, retrying")
+		time.Sleep(1 * time.Second)
+		if err := p.hv.Remove(ctx, cID); err != nil {
+			logger.WithError(err).Error("failed to remove container after retry")
+		}
+	}
+}
+
+// waitForStop polls container state until it is no longer running or the
+// timeout expires. Returns true if the container stopped.
+func (p *AppleVMProvider) waitForStop(ctx context.Context, cID string, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-deadline:
+			return false
+		case <-ctx.Done():
+			return false
+		case <-ticker.C:
+			info, err := p.hv.Inspect(ctx, cID)
+			if err != nil {
+				// Container already gone.
+				return true
+			}
+			if info.State != hypervisor.StateRunning {
+				return true
+			}
+		}
+	}
 }
 
 func (p *AppleVMProvider) hasPod(key string) bool {

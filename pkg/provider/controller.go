@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+
+	"github.com/containerd-shim-applevm-v2/pkg/hypervisor"
 )
 
 // Controller watches the Kubernetes API for pods assigned to our virtual node
@@ -66,10 +68,32 @@ func (c *Controller) onAdd(obj any) {
 		return
 	}
 
-	log.G(c.ctx).WithField("pod", pod.Namespace+"/"+pod.Name).Info("Pod added")
+	key := pod.Namespace + "/" + pod.Name
+	log.G(c.ctx).WithField("pod", key).Info("Pod added")
 
-	// Reconcile: if pod claims Running, verify the backing container actually exists
-	if pod.Status.Phase == corev1.PodRunning {
+	// If the pod has a DeletionTimestamp (evicted while we were down), clean up.
+	if pod.DeletionTimestamp != nil {
+		log.G(c.ctx).WithField("pod", key).Info("Pod marked for deletion during downtime, cleaning up")
+		if err := c.provider.DeletePod(c.ctx, pod); err != nil {
+			log.G(c.ctx).WithError(err).Error("Failed to delete evicted pod")
+		}
+		gracePeriod := int64(0)
+		if err := c.clientset.CoreV1().Pods(pod.Namespace).Delete(c.ctx, pod.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: &gracePeriod,
+		}); err != nil && !kerrors.IsNotFound(err) {
+			log.G(c.ctx).WithError(err).Error("Failed to force-delete evicted pod from API")
+		}
+		return
+	}
+
+	// Always check if the backing container exists, regardless of pod phase.
+	// After a kubelet restart, Kubernetes may have changed the pod phase
+	// (e.g. to Failed due to unreachable taint) even though the container
+	// is still running.
+	cID := containerID(pod, pod.Spec.Containers[0].Name)
+	info, err := c.provider.hv.Inspect(c.ctx, cID)
+	if err == nil && info.State == hypervisor.StateRunning {
+		log.G(c.ctx).WithField("pod", key).Info("Backing container still running, reconciling")
 		c.reconcilePod(pod)
 		return
 	}
@@ -134,22 +158,33 @@ func (c *Controller) onDelete(obj any) {
 }
 
 func (c *Controller) reconcilePod(pod *corev1.Pod) {
-	// Check if the first container actually exists in the Apple container runtime
-	cID := containerID(pod, pod.Spec.Containers[0].Name)
-	_, err := c.provider.hv.Inspect(c.ctx, cID)
-	if err != nil {
-		log.G(c.ctx).WithField("pod", pod.Namespace+"/"+pod.Name).Info("Stale pod detected, marking as failed")
-		c.updatePodStatus(pod, corev1.PodFailed, "backing container not found after kubelet restart")
-		return
+	key := pod.Namespace + "/" + pod.Name
+
+	// Verify all containers exist in the Apple container runtime.
+	for _, container := range pod.Spec.Containers {
+		cID := containerID(pod, container.Name)
+		_, err := c.provider.hv.Inspect(c.ctx, cID)
+		if err != nil {
+			log.G(c.ctx).WithField("pod", key).WithField("container", container.Name).
+				Info("Stale pod detected, backing container not found after kubelet restart")
+			c.updatePodStatus(pod, corev1.PodFailed, "backing container not found after kubelet restart")
+			return
+		}
 	}
 
-	// Container exists — re-register it in our provider's tracking map
+	// All containers exist — re-register in the provider's tracking map.
+	// Reset phase to Running since the backing containers are alive.
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Message = ""
+	pod.Status.Reason = ""
+
 	c.provider.mu.Lock()
-	c.provider.podsByKey[pod.Namespace+"/"+pod.Name] = pod.DeepCopy()
+	c.provider.podsByKey[key] = pod.DeepCopy()
 	c.provider.mu.Unlock()
 
-	// Push real container state to the API server
+	// Push real container state to the API server.
 	c.syncPodStatus(pod)
+	log.G(c.ctx).WithField("pod", key).Info("Pod reconciled after kubelet restart")
 }
 
 func (c *Controller) periodicStatusSync(ctx context.Context) {
