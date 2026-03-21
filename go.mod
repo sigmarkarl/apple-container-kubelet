@@ -1,9 +1,10 @@
 module github.com/containerd-shim-applevm-v2
 
-go 1.25.0
+go 1.26.1
 
 require (
 	github.com/containerd/log v0.1.0
+	github.com/creack/pty v1.1.24
 	github.com/pelletier/go-toml/v2 v2.2.4
 	k8s.io/api v0.35.2
 	k8s.io/apimachinery v0.35.2
@@ -11,7 +12,6 @@ require (
 )
 
 require (
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect

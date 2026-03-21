@@ -20,7 +20,7 @@ A [Virtual Kubelet](https://virtual-kubelet.io/) provider that runs Kubernetes p
 
 - macOS 26 (Tahoe) or later on Apple Silicon
 - The `container` CLI (`/usr/bin/container`) — ships with macOS 26
-- Go 1.25+ (to build from source)
+- Go 1.26+ (to build from source)
 - Access to a Kubernetes cluster (via kubeconfig or in-cluster config)
 
 ## Building
