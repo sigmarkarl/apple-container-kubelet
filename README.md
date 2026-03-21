@@ -1,6 +1,6 @@
-# applevm-kubelet
+# apple-container-kubelet
 
-A [Virtual Kubelet](https://virtual-kubelet.io/) provider that runs Kubernetes pods as lightweight virtual machines on macOS using Apple's native [`container`](https://developer.apple.com/documentation/virtualization) CLI (available in macOS 26+). Each pod container maps to an Apple VM, giving you Kubernetes-managed workloads on Apple Silicon Macs.
+A [Virtual Kubelet](https://virtual-kubelet.io/) provider that runs Kubernetes pods on macOS using Apple's native [`container`](https://developer.apple.com/documentation/virtualization) CLI (available in macOS 26+). Each pod container is backed by an Apple container, giving you Kubernetes-managed workloads on Apple Silicon Macs.
 
 ## Features
 
