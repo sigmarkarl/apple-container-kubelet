@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Extracts the cluster CA certificate from your current kubeconfig context
-# and updates the applevm-kubelet config to use it for mTLS.
+# and updates the apple-container-kubelet config to use it for mTLS.
 #
 # Usage:
 #   ./scripts/update-client-ca.sh [config-path]
 #
 # Arguments:
-#   config-path  Path to applevm-kubelet config.toml
-#               (default: /etc/applevm-kubelet/config.toml)
+#   config-path  Path to apple-container-kubelet config.toml
+#               (default: /etc/apple-container-kubelet/config.toml)
 #
 # When you switch Kubernetes clusters, run this script to update the CA cert
 # so the kubelet server only accepts connections from the new cluster's API server.
 
 set -euo pipefail
 
-CONFIG_PATH="${1:-/etc/applevm-kubelet/config.toml}"
+CONFIG_PATH="${1:-/etc/apple-container-kubelet/config.toml}"
 CA_DIR="$(dirname "$CONFIG_PATH")"
 CA_PATH="${CA_DIR}/cluster-ca.crt"
 
@@ -68,4 +68,4 @@ echo "Context:  ${CONTEXT}"
 echo "CA cert:  ${CA_PATH}"
 echo "Config:   ${CONFIG_PATH}"
 echo ""
-echo "Restart applevm-kubelet to pick up the new CA."
+echo "Restart apple-container-kubelet to pick up the new CA."

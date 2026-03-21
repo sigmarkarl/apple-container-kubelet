@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DefaultConfigPath = "/etc/applevm-kubelet/config.toml"
+	DefaultConfigPath = "/etc/apple-container-kubelet/config.toml"
 	DefaultVCPUs      = 1
 	DefaultMemoryMiB  = 1024
 )

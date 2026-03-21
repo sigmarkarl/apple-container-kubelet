@@ -29,11 +29,11 @@ A [Virtual Kubelet](https://virtual-kubelet.io/) provider that runs Kubernetes p
 make build
 ```
 
-The binary is written to `bin/applevm-kubelet`.
+The binary is written to `bin/apple-container-kubelet`.
 
 ## Configuration
 
-The kubelet reads configuration from `/etc/applevm-kubelet/config.toml` by default. A sample config is provided in [`config/default.toml`](config/default.toml):
+The kubelet reads configuration from `/etc/apple-container-kubelet/config.toml` by default. A sample config is provided in [`config/default.toml`](config/default.toml):
 
 ```toml
 [resources]
@@ -64,13 +64,13 @@ This extracts the CA certificate from your current kubeconfig context and update
 
 ```bash
 # Use default kubeconfig (~/.kube/config)
-bin/applevm-kubelet
+bin/apple-container-kubelet
 
 # Or specify a kubeconfig
-KUBECONFIG=/path/to/kubeconfig bin/applevm-kubelet
+KUBECONFIG=/path/to/kubeconfig bin/apple-container-kubelet
 
 # Override the node name
-APPLEVM_NODE_NAME=my-mac bin/applevm-kubelet
+APPLEVM_NODE_NAME=my-mac bin/apple-container-kubelet
 ```
 
 The kubelet will:

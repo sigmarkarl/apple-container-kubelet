@@ -1,4 +1,4 @@
-BINARY_NAME := applevm-kubelet
+BINARY_NAME := apple-container-kubelet
 BUILD_DIR := bin
 GO := go
 
