@@ -1,0 +1,15 @@
+[resources]
+# Number of vCPUs (0 = Apple container default)
+vcpus = 0
+# Memory in MiB (0 = Apple container default)
+memory_mib = 0
+
+[tls]
+# Path to a PEM-encoded CA certificate for verifying API server client certs (mTLS).
+# When set, only clients presenting a certificate signed by this CA are allowed.
+# Typically set to the cluster CA cert (e.g. /etc/kubernetes/pki/ca.crt).
+# Leave empty to allow unauthenticated connections (not recommended for production).
+client_ca_path = ""
+
+[debug]
+enabled = false
