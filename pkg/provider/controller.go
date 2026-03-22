@@ -261,9 +261,14 @@ func (c *Controller) handleRestarts(ctx context.Context, pod *corev1.Pod) {
 }
 
 func (c *Controller) updatePodStatus(pod *corev1.Pod, phase corev1.PodPhase, message string) {
-	pod.Status.Phase = phase
-	pod.Status.Message = message
-	_, err := c.clientset.CoreV1().Pods(pod.Namespace).UpdateStatus(c.ctx, pod, metav1.UpdateOptions{})
+	fresh, err := c.clientset.CoreV1().Pods(pod.Namespace).Get(c.ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		log.G(c.ctx).WithError(err).Error("Failed to fetch latest pod for status update")
+		return
+	}
+	fresh.Status.Phase = phase
+	fresh.Status.Message = message
+	_, err = c.clientset.CoreV1().Pods(fresh.Namespace).UpdateStatus(c.ctx, fresh, metav1.UpdateOptions{})
 	if err != nil {
 		log.G(c.ctx).WithError(err).Error("Failed to update pod status")
 	}
@@ -276,8 +281,13 @@ func (c *Controller) syncPodStatus(pod *corev1.Pod) {
 		return
 	}
 
-	pod.Status = *status
-	_, err = c.clientset.CoreV1().Pods(pod.Namespace).UpdateStatus(c.ctx, pod, metav1.UpdateOptions{})
+	fresh, err := c.clientset.CoreV1().Pods(pod.Namespace).Get(c.ctx, pod.Name, metav1.GetOptions{})
+	if err != nil {
+		log.G(c.ctx).WithError(err).Error("Failed to fetch latest pod for status sync")
+		return
+	}
+	fresh.Status = *status
+	_, err = c.clientset.CoreV1().Pods(fresh.Namespace).UpdateStatus(c.ctx, fresh, metav1.UpdateOptions{})
 	if err != nil {
 		log.G(c.ctx).WithError(err).Error("Failed to sync pod status")
 	}
