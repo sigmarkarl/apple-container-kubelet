@@ -163,7 +163,7 @@ func buildNode(nodeName string, nodeIP string) *corev1.Node {
 			NodeInfo: corev1.NodeSystemInfo{
 				Architecture:            "arm64",
 				OperatingSystem:         "darwin",
-				KubeletVersion:          "v1.33.0",
+				KubeletVersion:          "v1.33.6",
 				ContainerRuntimeVersion: "applevm://0.1.0",
 			},
 		},
