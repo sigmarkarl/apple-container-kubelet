@@ -401,7 +401,7 @@ func (p *AppleVMProvider) buildRunOpts(pod *corev1.Pod, c *corev1.Container) (hy
 
 	for _, e := range c.Env {
 		if e.ValueFrom != nil {
-			val := p.resolveEnvValueFrom(pod.Namespace, e.ValueFrom)
+			val := p.resolveEnvValueFrom(pod, e.ValueFrom)
 			if val != "" {
 				opts.Env[e.Name] = val
 			}
@@ -467,11 +467,11 @@ func (p *AppleVMProvider) resolveEnvFrom(namespace string, envFrom []corev1.EnvF
 	}
 }
 
-func (p *AppleVMProvider) resolveEnvValueFrom(namespace string, src *corev1.EnvVarSource) string {
+func (p *AppleVMProvider) resolveEnvValueFrom(pod *corev1.Pod, src *corev1.EnvVarSource) string {
 	ctx := context.Background()
 
 	if src.ConfigMapKeyRef != nil {
-		cm, err := p.clientset.CoreV1().ConfigMaps(namespace).Get(ctx, src.ConfigMapKeyRef.Name, metav1.GetOptions{})
+		cm, err := p.clientset.CoreV1().ConfigMaps(pod.Namespace).Get(ctx, src.ConfigMapKeyRef.Name, metav1.GetOptions{})
 		if err != nil {
 			return ""
 		}
@@ -479,7 +479,7 @@ func (p *AppleVMProvider) resolveEnvValueFrom(namespace string, src *corev1.EnvV
 	}
 
 	if src.SecretKeyRef != nil {
-		secret, err := p.clientset.CoreV1().Secrets(namespace).Get(ctx, src.SecretKeyRef.Name, metav1.GetOptions{})
+		secret, err := p.clientset.CoreV1().Secrets(pod.Namespace).Get(ctx, src.SecretKeyRef.Name, metav1.GetOptions{})
 		if err != nil {
 			return ""
 		}
@@ -487,17 +487,38 @@ func (p *AppleVMProvider) resolveEnvValueFrom(namespace string, src *corev1.EnvV
 	}
 
 	if src.FieldRef != nil {
-		return resolveFieldRef(src.FieldRef.FieldPath, namespace)
+		return resolveFieldRef(pod, src.FieldRef.FieldPath)
 	}
 
 	return ""
 }
 
-func resolveFieldRef(fieldPath, namespace string) string {
+func resolveFieldRef(pod *corev1.Pod, fieldPath string) string {
 	switch fieldPath {
+	case "metadata.name":
+		return pod.Name
 	case "metadata.namespace":
-		return namespace
+		return pod.Namespace
+	case "metadata.uid":
+		return string(pod.UID)
+	case "spec.nodeName":
+		return pod.Spec.NodeName
+	case "spec.serviceAccountName":
+		return pod.Spec.ServiceAccountName
+	case "status.podIP":
+		return pod.Status.PodIP
+	case "status.hostIP":
+		return pod.Status.HostIP
 	default:
+		// Handle metadata.labels['key'] and metadata.annotations['key']
+		if strings.HasPrefix(fieldPath, "metadata.labels['") && strings.HasSuffix(fieldPath, "']") {
+			key := fieldPath[len("metadata.labels['") : len(fieldPath)-len("']")]
+			return pod.Labels[key]
+		}
+		if strings.HasPrefix(fieldPath, "metadata.annotations['") && strings.HasSuffix(fieldPath, "']") {
+			key := fieldPath[len("metadata.annotations['") : len(fieldPath)-len("']")]
+			return pod.Annotations[key]
+		}
 		return ""
 	}
 }
