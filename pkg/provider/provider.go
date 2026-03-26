@@ -156,6 +156,13 @@ func (p *AppleVMProvider) UpdatePod(ctx context.Context, pod *corev1.Pod) error 
 func (p *AppleVMProvider) DeletePod(ctx context.Context, pod *corev1.Pod) error {
 	log.G(ctx).WithField("pod", podKey(pod)).Info("DeletePod")
 
+	// Remove from tracking BEFORE cleaning up containers so that
+	// periodicStatusSync / handleRestarts won't race and restart
+	// containers that are being torn down.
+	p.mu.Lock()
+	delete(p.podsByKey, podKey(pod))
+	p.mu.Unlock()
+
 	p.cleanupPodContainers(ctx, pod)
 
 	now := metav1.Now()
@@ -171,10 +178,6 @@ func (p *AppleVMProvider) DeletePod(ctx context.Context, pod *corev1.Pod) error 
 	}
 
 	p.notify(pod)
-
-	p.mu.Lock()
-	delete(p.podsByKey, podKey(pod))
-	p.mu.Unlock()
 
 	return nil
 }
