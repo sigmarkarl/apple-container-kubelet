@@ -2,6 +2,23 @@
 
 A [Virtual Kubelet](https://virtual-kubelet.io/) provider that runs Kubernetes pods on macOS using Apple's native [`container`](https://developer.apple.com/documentation/virtualization) CLI (available in macOS 26+). Each pod container is backed by an Apple container, giving you Kubernetes-managed workloads on Apple Silicon Macs.
 
+## Why this vs kind / k3d / colima / minikube?
+
+Those tools spin up a **local Kubernetes cluster on your Mac**, usually inside a single Linux VM (or Docker Desktop). `apple-container-kubelet` solves a different problem: it makes your Mac a **node in any existing cluster** (your team's dev cluster, a kind cluster on the same machine, anything reachable). Pods scheduled to it run as **native Apple containers** — one lightweight VM per container, on the same Virtualization.framework that powers macOS 26.
+
+|                          | apple-container-kubelet | kind / k3d / minikube | colima / Docker Desktop |
+| ------------------------ | ----------------------- | --------------------- | ----------------------- |
+| Runtime                  | Apple `container` CLI   | Docker / containerd in a Linux VM | Docker in a Linux VM |
+| Adds Mac to *your* cluster | ✅                    | ❌ (creates a new local one) | ❌ |
+| Per-container isolation  | Lightweight VM each     | Shared VM, namespaced | Shared VM, namespaced |
+| Native arm64, no QEMU    | ✅                      | ✅                    | ✅ |
+| Requires Docker          | ❌                      | ❌ (kind via podman possible) | ✅ |
+| First-party Apple runtime | ✅                     | ❌                    | ❌ |
+
+**When to reach for it:** you want a remote/local Kubernetes cluster to schedule workloads onto your Mac directly — for CI, edge dev, or burst capacity — using Apple's runtime instead of Docker.
+
+**When not to:** you just want a throwaway local cluster for `kubectl apply` testing — `kind` is still the simplest answer there.
+
 ## Features
 
 - **Virtual Kubelet node** — registers a virtual node (`darwin/arm64`) in your Kubernetes cluster
