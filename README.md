@@ -23,7 +23,16 @@ A [Virtual Kubelet](https://virtual-kubelet.io/) provider that runs Kubernetes p
 - Go 1.26+ (to build from source)
 - Access to a Kubernetes cluster (via kubeconfig or in-cluster config)
 
-## Building
+## Installing
+
+### Homebrew (macOS, Apple Silicon)
+
+```bash
+brew tap sigmarkarl/tap
+brew install apple-container-kubelet
+```
+
+### Building from source
 
 ```bash
 make build

@@ -1,0 +1,80 @@
+version: 2
+
+project_name: apple-container-kubelet
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: apple-container-kubelet
+    binary: apple-container-kubelet
+    main: ./cmd/containerd-shim-applevm-v2
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    files:
+      - LICENSE
+      - README.md
+      - config/default.toml
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: sigmarkarl
+    name: apple-container-kubelet
+  draft: false
+  prerelease: auto
+
+brews:
+  - name: apple-container-kubelet
+    repository:
+      owner: sigmarkarl
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/sigmarkarl/apple-container-kubelet"
+    description: "Virtual Kubelet provider that runs Kubernetes pods as Apple containers on macOS 26+"
+    license: "MIT"
+    skip_upload: auto
+    install: |
+      bin.install "apple-container-kubelet"
+      (etc/"apple-container-kubelet").mkpath
+      etc.install "config/default.toml" => "apple-container-kubelet/config.toml" unless (etc/"apple-container-kubelet/config.toml").exist?
+    caveats: |
+      apple-container-kubelet requires:
+        * macOS 26 (Tahoe) or later on Apple Silicon
+        * Apple's `container` CLI at /usr/bin/container (ships with macOS 26)
+        * A reachable Kubernetes cluster (kubeconfig at ~/.kube/config or KUBECONFIG)
+
+      Default config installed at:
+        #{etc}/apple-container-kubelet/config.toml
+
+      To start manually:
+        apple-container-kubelet
+    test: |
+      assert_match "apple-container-kubelet", shell_output("#{bin}/apple-container-kubelet --help 2>&1", 2)
